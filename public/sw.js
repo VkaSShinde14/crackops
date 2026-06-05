@@ -1,4 +1,4 @@
-const CACHE_NAME = "ado-cracker-v3";
+const CACHE_NAME = "crackops-v1";
 const APP_SHELL = [
   "/",
   "/index.html",

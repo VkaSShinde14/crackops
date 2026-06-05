@@ -7,7 +7,7 @@ export type InterviewType =
 export type QuestionStatus = "new" | "known" | "weak" | "revision";
 export type RevisionCadence = "today" | "tomorrow" | "3 days" | "7 days";
 export type Difficulty = "basic" | "intermediate" | "senior";
-export type FollowUpLevel = "basic" | "intermediate" | "advanced" | "architect";
+export type FollowUpLevel = "basic" | "intermediate" | "advanced" | "senior" | "architect";
 export type ViewId =
   | "home"
   | "setup"
@@ -39,6 +39,13 @@ export interface ArchitectureNote {
   alternatives: string[];
   useWhen: string[];
   avoidWhen: string[];
+  endToEndWorkflow?: string[];
+  securityConsiderations?: string[];
+  costConsiderations?: string[];
+  commonMistakes?: string[];
+  troubleshootingApproach?: string[];
+  productionIncidentExamples?: string[];
+  architectDiscussion?: string;
 }
 
 export interface Topic {
@@ -55,6 +62,17 @@ export interface Topic {
   prerequisites?: string[];
   relatedTopics?: string[];
   relatedTools?: string[];
+  whyExists?: string;
+  businessProblem?: string;
+  endToEndWorkflow?: string[];
+  securityConsiderations?: string[];
+  costConsiderations?: string[];
+  commonMistakes?: string[];
+  troubleshootingApproach?: string[];
+  productionIncidentExamples?: string[];
+  architectDiscussion?: string;
+  incidentLinks?: string[];
+  nextTopics?: string[];
 }
 
 export interface Question {
@@ -66,6 +84,17 @@ export interface Question {
   detailedAnswer: string;
   seniorAnswer: string;
   interviewVersion: string;
+  internalWorking?: string;
+  architectureDiagram?: string;
+  productionUsage?: string;
+  securityConsiderations?: string[];
+  costConsiderations?: string[];
+  commonMistakes?: string[];
+  troubleshootingGuide?: string[];
+  realIncidentExample?: string;
+  commandsAndLogs?: string[];
+  advancedDiscussion?: string;
+  architectDiscussion?: string;
   followUps?: FollowUpNode[];
 }
 
@@ -82,6 +111,12 @@ export interface ToolPage {
   realWorldUsage: string;
   limitations: string[];
   securityNotes: string[];
+  advantages?: string[];
+  disadvantages?: string[];
+  comparison?: Array<{ criteria: string; tool: string; alternative: string; guidance: string }>;
+  costImpact?: string[];
+  productionIncidents?: string[];
+  bestPractices?: string[];
   interviewQuestions: Question[];
   followUps: FollowUpNode[];
 }
@@ -93,6 +128,9 @@ export interface IncidentPlaybook {
   symptoms: string[];
   likelyRootCauses: string[];
   investigationFlow: string[];
+  logsToCheck?: string[];
+  commandsToRun?: string[];
+  rootCauseAnalysis?: string[];
   fix: string[];
   prevention: string[];
   interviewAnswer: string;
@@ -103,9 +141,21 @@ export interface CostModule {
   id: string;
   title: string;
   area: string;
+  costDrivers?: string[];
   strategies: string[];
+  savingsPotential?: string;
   tradeoffs: string[];
   interviewChecklist: string[];
+  interviewAnswer?: string;
+}
+
+export interface SecurityTopic {
+  id: string;
+  title: string;
+  area: string;
+  risk: string;
+  controls: string[];
+  interviewAnswer: string;
 }
 
 export interface CompanyPack {

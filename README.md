@@ -1,6 +1,8 @@
-# Azure DevOps Interview Cracker
+# CrackOps
 
-Mobile-first Azure DevOps interview preparation operating system. It is a local-first React + TypeScript PWA with a dashboard, interview profile setup, learning topics, practice Q&A, revision queue, mock interviewer, tool encyclopedia, incident playbooks, cost optimization, company packs, project stories, and a knowledge graph.
+Learn. Practice. Crack.
+
+Mobile-first DevOps interview operating system for Azure DevOps, Cloud DevOps, Platform Engineering, SRE, and DevOps Architect preparation. It is a local-first React + TypeScript PWA with a dashboard, interview profile setup, learning topics, practice Q&A, revision queue, mock interviewer, tool encyclopedia, incident playbooks, cost optimization, company packs, project stories, and a knowledge graph.
 
 ## Run Locally
 
@@ -60,3 +62,12 @@ public/
 - Project story builder for common Azure DevOps project combinations.
 - Mock interviewer with typed answer notes, follow-up prompts, scoring signals, and suggestions.
 - Knowledge graph connecting topics, tools, incidents, costs, and questions.
+
+## Enterprise Content Volume
+
+- 1,000+ practical Azure DevOps / Cloud DevOps interview questions generated from enterprise scenarios.
+- 100+ production incident playbooks plus 100+ troubleshooting scenarios.
+- 50+ architecture explanations.
+- 50+ cost optimization topics.
+- 50+ security topics.
+- Recursive follow-up trees go 20+ levels deep across basic, intermediate, advanced, senior, and architect levels.

@@ -32,9 +32,10 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   companyPacks,
+  contentStats,
   costModules,
   enrichedQuestions as questions,
   enrichedTopics as topics,
@@ -99,6 +100,7 @@ function cx(...classes: Array<string | false | undefined>) {
 
 export function App() {
   const [view, setView] = useState<ViewId>("home");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [profile, setProfile] = useLocalStorage<Profile>("ado-profile", defaultProfile);
   const [progress, setProgress] = useLocalStorage<ProgressMap>("ado-progress", {});
   const [selectedTopicId, setSelectedTopicId] = useState(topics[0].id);
@@ -118,7 +120,8 @@ export function App() {
   const selectedPack = companyPacks.find((pack) => pack.id === selectedPackId) ?? companyPacks[0];
   const selectedProject = projectStories.find((project) => project.id === selectedProjectId) ?? projectStories[0];
   const selectedGraphNode = knowledgeNodes.find((node) => node.id === selectedGraphNodeId) ?? knowledgeNodes[0];
-  const readiness = useMemo(() => getReadinessScore(progress), [progress]);
+  const readinessModel = useMemo(() => getReadinessModel(progress), [progress]);
+  const readiness = readinessModel.score;
   const weakTopics = useMemo(() => getWeakTopics(progress), [progress]);
   const studyPath = useMemo(() => getStudyPath(profile, progress), [profile, progress]);
   const todaysPlan = studyPath.slice(0, 4);
@@ -151,11 +154,17 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="icon-btn" onClick={() => setView("setup")} aria-label="Open setup">
+        <button
+          className="icon-btn"
+          onClick={() => setSettingsOpen((open) => !open)}
+          aria-label={settingsOpen ? "Close settings" : "Open settings"}
+          aria-expanded={settingsOpen}
+          aria-controls="settings-drawer"
+        >
           <Settings2 size={20} />
         </button>
         <div>
-          <p className="eyebrow">Azure DevOps Interview Cracker</p>
+          <BrandMark />
           <h1>{pageTitle(view)}</h1>
         </div>
         <div className="streak" aria-label="Readiness score">
@@ -172,6 +181,7 @@ export function App() {
             weakTopics={weakTopics}
             todaysPlan={todaysPlan}
             revisionCount={revisionCount}
+            readinessModel={readinessModel}
             onNavigate={setView}
             onOpenTopic={openTopic}
             onOpenQuestion={openQuestion}
@@ -249,7 +259,85 @@ export function App() {
           );
         })}
       </nav>
+
+      <SettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        profile={profile}
+        setProfile={setProfile}
+        studyPath={studyPath}
+      />
     </main>
+  );
+}
+
+function SettingsDrawer({
+  open,
+  onClose,
+  profile,
+  setProfile,
+  studyPath,
+}: {
+  open: boolean;
+  onClose: () => void;
+  profile: Profile;
+  setProfile: React.Dispatch<React.SetStateAction<Profile>>;
+  studyPath: Topic[];
+}) {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const startX = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.body.classList.add("drawer-open");
+    window.setTimeout(() => drawerRef.current?.focus(), 0);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.classList.remove("drawer-open");
+      previous?.focus?.();
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="drawer-overlay" onMouseDown={onClose}>
+      <aside
+        id="settings-drawer"
+        ref={drawerRef}
+        className="settings-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Interview profile settings"
+        tabIndex={-1}
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => {
+          startX.current = event.touches[0]?.clientX ?? null;
+        }}
+        onTouchMove={(event) => {
+          if (startX.current === null) return;
+          const currentX = event.touches[0]?.clientX ?? startX.current;
+          if (startX.current - currentX > 70) onClose();
+        }}
+        onTouchEnd={() => {
+          startX.current = null;
+        }}
+      >
+        <div className="drawer-head">
+          <BrandMark />
+          <button className="icon-btn" onClick={onClose} aria-label="Close settings drawer">
+            <ChevronLeft size={20} />
+          </button>
+        </div>
+        <SetupView profile={profile} setProfile={setProfile} studyPath={studyPath} onDone={onClose} />
+      </aside>
+      <button className="drawer-scrim" onMouseDown={onClose} aria-label="Close settings by tapping outside" />
+    </div>
   );
 }
 
@@ -259,6 +347,7 @@ function HomeDashboard({
   weakTopics,
   todaysPlan,
   revisionCount,
+  readinessModel,
   onNavigate,
   onOpenTopic,
   onOpenQuestion,
@@ -268,6 +357,7 @@ function HomeDashboard({
   weakTopics: Topic[];
   todaysPlan: Topic[];
   revisionCount: number;
+  readinessModel: ReturnType<typeof getReadinessModel>;
   onNavigate: (view: ViewId) => void;
   onOpenTopic: (topic: Topic) => void;
   onOpenQuestion: (question: Question) => void;
@@ -290,9 +380,47 @@ function HomeDashboard({
 
       <div className="metrics-grid">
         <Metric icon={CalendarDays} label="Interview" value={`${profile.daysLeft} days`} />
-        <Metric icon={Moon} label="Offline shell" value="Ready" />
+        <Metric icon={Moon} label="Content bank" value={`${contentStats.questions}+ Qs`} />
         <Metric icon={Bell} label="Revisions" value={`${revisionCount} due`} />
       </div>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">Readiness engine</p>
+            <h3>Coverage signals</h3>
+          </div>
+          <Gauge size={20} />
+        </div>
+        <div className="score-grid">
+          <Metric icon={BookOpen} label="Topics" value={`${readinessModel.topicCoverage}%`} />
+          <Metric icon={Target} label="Questions" value={`${readinessModel.questionCoverage}%`} />
+          <Metric icon={Wrench} label="Incidents" value={`${readinessModel.incidentCoverage}%`} />
+          <Metric icon={Boxes} label="Tools" value={`${readinessModel.toolCoverage}%`} />
+          <Metric icon={CircleDollarSign} label="Cost" value={`${readinessModel.costCoverage}%`} />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">Priority</p>
+            <h3>Recommended daily plan</h3>
+          </div>
+          <Sparkles size={20} />
+        </div>
+        <div className="plan-list">
+          {readinessModel.dailyPlan.map((item, index) => (
+            <div className="plan-row static" key={item}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{item}</strong>
+                <small>Recommended from weak coverage and enterprise interview patterns</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="panel">
         <div className="panel-head">
@@ -362,6 +490,27 @@ function HomeDashboard({
           </button>
         ))}
       </section>
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <div className="brand-mark" aria-label="CrackOps - Learn. Practice. Crack.">
+      <span className="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img">
+          <path className="logo-cloud" d="M20 41h27a10 10 0 0 0 .8-20 15 15 0 0 0-28.5-4.2A11.5 11.5 0 0 0 20 41Z" />
+          <path className="logo-flow" d="M17 32h10l5-7 6 14 5-7h8" />
+          <path className="logo-hex" d="M32 9 44 16v14L32 37 20 30V16Z" />
+          <path className="logo-terminal" d="m18 47 6 4-6 4M29 55h13" />
+          <circle className="logo-target" cx="49" cy="15" r="7" />
+          <circle className="logo-target-dot" cx="49" cy="15" r="2.2" />
+        </svg>
+      </span>
+      <span>
+        <strong>CrackOps</strong>
+        <small>Learn. Practice. Crack.</small>
+      </span>
     </div>
   );
 }
@@ -511,10 +660,20 @@ function LearningView({
         <p className="eyebrow">{selectedTopic.category}</p>
         <h2>{selectedTopic.title}</h2>
         <AnswerBlock title="Definition" body={selectedTopic.definition} />
+        {selectedTopic.whyExists && <AnswerBlock title="Why it exists" body={selectedTopic.whyExists} />}
+        {selectedTopic.businessProblem && <AnswerBlock title="Business problem solved" body={selectedTopic.businessProblem} />}
         <AnswerBlock title="Interview answer" body={selectedTopic.interviewAnswer} />
         <AnswerBlock title="Deep answer" body={selectedTopic.deepAnswer} />
         <AnswerBlock title="Real-world use case" body={selectedTopic.useCase} />
+        {selectedTopic.endToEndWorkflow && <ListBlock title="End-to-end workflow" items={selectedTopic.endToEndWorkflow} />}
+        {selectedTopic.securityConsiderations && <ListBlock title="Security considerations" items={selectedTopic.securityConsiderations} />}
+        {selectedTopic.costConsiderations && <ListBlock title="Cost considerations" items={selectedTopic.costConsiderations} />}
+        {selectedTopic.commonMistakes && <ListBlock title="Common mistakes" items={selectedTopic.commonMistakes} />}
+        {selectedTopic.troubleshootingApproach && <ListBlock title="Troubleshooting approach" items={selectedTopic.troubleshootingApproach} />}
+        {selectedTopic.productionIncidentExamples && <ListBlock title="Production incident examples" items={selectedTopic.productionIncidentExamples} />}
+        {selectedTopic.architectDiscussion && <AnswerBlock title="Architect-level discussion" body={selectedTopic.architectDiscussion} />}
         {selectedTopic.architecture && <ArchitectureExplorer architecture={selectedTopic.architecture} />}
+        <KnowledgeLinks topic={selectedTopic} />
         <div className="answer-block">
           <h4>Common follow-ups</h4>
           {selectedTopic.followUps.map((followUp) => (
@@ -638,8 +797,19 @@ function PracticeView({
         </div>
         <AnswerBlock title="Short answer" body={activeQuestion.shortAnswer} />
         <AnswerBlock title="Detailed answer" body={activeQuestion.detailedAnswer} />
+        {activeQuestion.internalWorking && <AnswerBlock title="Internal working" body={activeQuestion.internalWorking} />}
+        {activeQuestion.architectureDiagram && <AnswerBlock title="Architecture diagram description" body={activeQuestion.architectureDiagram} />}
+        {activeQuestion.productionUsage && <AnswerBlock title="Production usage example" body={activeQuestion.productionUsage} />}
+        {activeQuestion.securityConsiderations && <ListBlock title="Security considerations" items={activeQuestion.securityConsiderations} />}
+        {activeQuestion.costConsiderations && <ListBlock title="Cost considerations" items={activeQuestion.costConsiderations} />}
+        {activeQuestion.commonMistakes && <ListBlock title="Common mistakes" items={activeQuestion.commonMistakes} />}
+        {activeQuestion.troubleshootingGuide && <ListBlock title="Troubleshooting guide" items={activeQuestion.troubleshootingGuide} />}
+        {activeQuestion.realIncidentExample && <AnswerBlock title="Real incident example" body={activeQuestion.realIncidentExample} />}
+        {activeQuestion.commandsAndLogs && <CommandBlock title="Commands and logs" items={activeQuestion.commandsAndLogs} />}
+        {activeQuestion.advancedDiscussion && <AnswerBlock title="Advanced discussion" body={activeQuestion.advancedDiscussion} />}
+        {activeQuestion.architectDiscussion && <AnswerBlock title="Architect-level discussion" body={activeQuestion.architectDiscussion} />}
         <AnswerBlock title="Senior-level answer" body={activeQuestion.seniorAnswer} />
-        <AnswerBlock title="How to say it in interview" body={activeQuestion.interviewVersion} />
+        <AnswerBlock title="Interview speaking version" body={activeQuestion.interviewVersion} />
         <FollowUpTree nodes={activeQuestion.followUps ?? []} />
         <div className="status-actions">
           {statuses.slice(1).map((status) => (
@@ -766,9 +936,15 @@ function ToolsView({
         <ListBlock title="Components" items={selectedTool.components} />
         <ArchitectureExplorer architecture={selectedTool.architecture} />
         <AnswerBlock title="Real-world usage" body={selectedTool.realWorldUsage} />
+        {selectedTool.advantages && <ListBlock title="Advantages" items={selectedTool.advantages} />}
+        {selectedTool.disadvantages && <ListBlock title="Disadvantages" items={selectedTool.disadvantages} />}
         <ListBlock title="Alternatives" items={selectedTool.alternatives} />
+        {selectedTool.comparison && <ComparisonTable rows={selectedTool.comparison} />}
         <ListBlock title="Limitations" items={selectedTool.limitations} />
         <ListBlock title="Security notes" items={selectedTool.securityNotes} />
+        {selectedTool.costImpact && <ListBlock title="Cost impact" items={selectedTool.costImpact} />}
+        {selectedTool.productionIncidents && <ListBlock title="Production incidents" items={selectedTool.productionIncidents} />}
+        {selectedTool.bestPractices && <ListBlock title="Best practices" items={selectedTool.bestPractices} />}
         <FollowUpTree nodes={selectedTool.followUps} />
       </section>
       <section className="panel">
@@ -819,6 +995,9 @@ function IncidentsView({
         <ListBlock title="Symptoms" items={selectedIncident.symptoms} />
         <ListBlock title="Likely root causes" items={selectedIncident.likelyRootCauses} />
         <ListBlock title="Investigation flow" items={selectedIncident.investigationFlow} />
+        {selectedIncident.logsToCheck && <ListBlock title="Logs to check" items={selectedIncident.logsToCheck} />}
+        {selectedIncident.commandsToRun && <CommandBlock title="Commands to run" items={selectedIncident.commandsToRun} />}
+        {selectedIncident.rootCauseAnalysis && <ListBlock title="Root cause analysis" items={selectedIncident.rootCauseAnalysis} />}
         <ListBlock title="Fix" items={selectedIncident.fix} />
         <ListBlock title="Prevention" items={selectedIncident.prevention} />
         <AnswerBlock title="Interview answer" body={selectedIncident.interviewAnswer} />
@@ -850,9 +1029,12 @@ function CostView() {
             </div>
             <CircleDollarSign size={20} />
           </div>
+          {module.costDrivers && <ListBlock title="Current cost drivers" items={module.costDrivers} />}
           <ListBlock title="Reduction strategies" items={module.strategies} />
+          {module.savingsPotential && <AnswerBlock title="Savings potential" body={module.savingsPotential} />}
           <ListBlock title="Tradeoffs" items={module.tradeoffs} />
           <ListBlock title="Interview checklist" items={module.interviewChecklist} />
+          {module.interviewAnswer && <AnswerBlock title="Interview-ready answer" body={module.interviewAnswer} />}
         </section>
       ))}
     </div>
@@ -1168,6 +1350,67 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function CommandBlock({ title, items }: { title: string; items: string[] }) {
+  return (
+    <article className="answer-block">
+      <h4>{title}</h4>
+      <div className="command-list">
+        {items.map((item) => (
+          <code key={item}>{item}</code>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ComparisonTable({
+  rows,
+}: {
+  rows: Array<{ criteria: string; tool: string; alternative: string; guidance: string }>;
+}) {
+  return (
+    <article className="answer-block comparison-block">
+      <h4>Comparison table</h4>
+      {rows.map((row) => (
+        <div className="comparison-row" key={row.criteria}>
+          <strong>{row.criteria}</strong>
+          <p><span>Tool:</span> {row.tool}</p>
+          <p><span>Alternative:</span> {row.alternative}</p>
+          <p><span>Guidance:</span> {row.guidance}</p>
+        </div>
+      ))}
+    </article>
+  );
+}
+
+function KnowledgeLinks({ topic }: { topic: Topic }) {
+  const groups = [
+    ["Prerequisites", topic.prerequisites],
+    ["Related topics", topic.relatedTopics],
+    ["Next topics", topic.nextTopics],
+    ["Tool links", topic.relatedTools],
+    ["Incident links", topic.incidentLinks],
+  ] as const;
+
+  return (
+    <article className="answer-block">
+      <h4>Knowledge graph links</h4>
+      <div className="link-groups">
+        {groups.map(([label, values]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <div className="chip-wrap">
+              {(values ?? []).map((value) => (
+                <span className="topic-chip static-chip" key={value}>{value}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function ArchitectureExplorer({ architecture }: { architecture: NonNullable<Topic["architecture"]> }) {
   return (
     <article className="architecture-card">
@@ -1229,7 +1472,7 @@ function FollowUpBranch({ node }: { node: FollowUpNode }) {
       {open && (
         <div className="followup-answer">
           <AnswerBlock title="Answer" body={node.answer} />
-          <AnswerBlock title="How to say it" body={node.sayIt} />
+          <AnswerBlock title="Interview speaking version" body={node.sayIt} />
           {node.children?.map((child) => (
             <FollowUpBranch key={child.id} node={child} />
           ))}
@@ -1267,16 +1510,33 @@ function pageTitle(view: ViewId) {
   return names[view];
 }
 
-function getReadinessScore(progress: ProgressMap) {
+function getReadinessModel(progress: ProgressMap) {
   const total = questions.length;
-  const score = questions.reduce((sum, question) => {
+  const questionScore = questions.reduce((sum, question) => {
     const state = getProgress(progress, question.id);
     if (state.status === "known") return sum + 1;
     if (state.status === "revision") return sum + 0.55;
     if (state.status === "weak") return sum + 0.2;
     return sum + (state.bookmarked ? 0.1 : 0);
   }, 0);
-  return Math.max(8, Math.round((score / total) * 100));
+  const knownTopicIds = new Set(
+    questions.filter((question) => getProgress(progress, question.id).status !== "new").map((question) => question.topicId)
+  );
+  const weakTopicIds = getWeakTopics(progress).map((topic) => topic.title);
+  const questionCoverage = Math.round((questionScore / total) * 100);
+  const topicCoverage = Math.round((knownTopicIds.size / topics.length) * 100);
+  const incidentCoverage = Math.min(100, Math.round((knownTopicIds.size / Math.max(1, topics.length)) * 75 + (questionCoverage > 30 ? 25 : 0)));
+  const toolCoverage = Math.min(100, Math.round((knownTopicIds.size / Math.max(1, tools.length)) * 100));
+  const costCoverage = Math.min(100, Math.round((questionCoverage + topicCoverage) / 2));
+  const securityCoverage = Math.min(100, Math.round((questionCoverage * 0.5) + (toolCoverage * 0.5)));
+  const score = Math.max(8, Math.round((questionCoverage * 0.3) + (topicCoverage * 0.2) + (incidentCoverage * 0.15) + (toolCoverage * 0.15) + (costCoverage * 0.1) + (securityCoverage * 0.1)));
+  const dailyPlan = [
+    weakTopicIds[0] ? `Revise weak area: ${weakTopicIds[0]}` : "Practice Azure Pipelines troubleshooting",
+    "Drill one tool page through architect-level follow-ups",
+    "Study one production incident and speak the RCA out loud",
+    "Review one cost optimization answer with tradeoffs",
+  ];
+  return { score, questionCoverage, topicCoverage, incidentCoverage, toolCoverage, costCoverage, securityCoverage, dailyPlan };
 }
 
 function getWeakTopics(progress: ProgressMap) {

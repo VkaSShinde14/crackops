@@ -1,7 +1,7 @@
 {
-  "name": "Azure DevOps Interview Cracker",
-  "short_name": "ADO Cracker",
-  "description": "Focused Azure DevOps interview preparation with learning, practice, revision, and mock mode.",
+  "name": "CrackOps",
+  "short_name": "CrackOps",
+  "description": "Learn. Practice. Crack. A DevOps interview operating system for Azure DevOps, Cloud DevOps, SRE, Platform and Architect roles.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
